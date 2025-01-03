@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow Timer con Efectos</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #1e1e1e;
+            color: #fff;
+        }
+        .container {
+            text-align: center;
+            max-width: 400px;
+        }
+        .timer {
+            font-size: 5rem;
+            margin-bottom: 20px;
+            color: white;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+        button:active {
+            transform: scale(0.95);
+            background-color: #333;
+        }
+        .start {
+            background-color: #4caf50;
+            color: #fff;
+        }
+        .pause {
+            background-color: #f44336;
+            color: #fff;
+        }
+        .reset {
+            background-color: #2196f3;
+            color: #fff;
+        }
+        .settings {
+            margin-top: 20px;
+            text-align: left;
+        }
+        .settings label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .settings input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+        .settings input[type="checkbox"] {
+            margin-left: 10px;
+        }
+        .message {
+            font-size: 1.2rem;
+            margin-top: 20px;
+            color: #ffcc00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="timer" class="timer">50:00</div>
+        <div class="controls">
+            <button id="startBtn" class="start">Iniciar</button>
+            <button id="pauseBtn" class="pause">Pausar/Reanudar</button>
+            <button id="resetBtn" class="reset">Reiniciar</button>
+        </div>
+        <div class="settings">
+            <label for="workDuration">Duración del flujo (minutos):</label>
+            <input type="number" id="workDuration" value="50">
+            <label for="pauseDuration">Duración de la pausa (minutos):</label>
+            <input type="number" id="pauseDuration" value="10">
+            <label>
+                <input type="checkbox" id="autoStartPause">
+                Iniciar automáticamente la pausa tras terminar el flujo
+            </label>
+        </div>
+        <div id="message" class="message"></div>
+    </div>
+
+    <!-- Audio para alertas -->
+    <audio id="alertSound" src="https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3"></audio>
+
+    <script>
+        let timerInterval;
+        let timeLeft = 50 * 60; // Duración inicial: 50 minutos en segundos
+        let isPaused = false;
+        let isWorkPhase = true; // Indica si estamos en flujo (trabajo) o pausa
+
+        const timerDisplay = document.getElementById("timer");
+        const startBtn = document.getElementById("startBtn");
+        const pauseBtn = document.getElementById("pauseBtn");
+        const resetBtn = document.getElementById("resetBtn");
+        const workDurationInput = document.getElementById("workDuration");
+        const pauseDurationInput = document.getElementById("pauseDuration");
+        const autoStartPauseCheckbox = document.getElementById("autoStartPause");
+        const alertSound = document.getElementById("alertSound");
+        const message = document.getElementById("message");
+
+        function updateDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timerDisplay.textContent =
+                String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+        }
+
+        function startTimer() {
+            if (timerInterval) return; // Evitar múltiples intervalos
+            if (isPaused) {
+                isPaused = false; // Reanudar si estaba pausado
+            } else if (isWorkPhase) {
+                timeLeft = parseInt(workDurationInput.value) * 60; // Duración del flujo
+            } else {
+                timeLeft = parseInt(pauseDurationInput.value) * 60; // Duración de la pausa
+                timerDisplay.style.color = 'yellow'; // Cambiar color durante la pausa
+            }
+            timerInterval = setInterval(() => {
+                if (timeLeft > 0) {
+                    timeLeft--;
+                    updateDisplay();
+                } else {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    if (isWorkPhase) {
+                        handleWorkPhaseEnd();
+                    } else {
+                        handlePausePhaseEnd();
+                    }
+                }
+            }, 1000);
+        }
+
+        function handleWorkPhaseEnd() {
+            alertSound.play(); // Reproducir el sonido
+            showMessage('¡Flujo terminado!');
+            isWorkPhase = false; // Cambiar a pausa
+            if (autoStartPauseCheckbox.checked) {
+                startPausePhase();
+            }
+        }
+
+        function handlePausePhaseEnd() {
+            alertSound.play(); // Reproducir el sonido
+            showMessage('¡Pausa terminada!');
+            resetTimer(); // Reiniciar tras la pausa
+        }
+
+        function startPausePhase() {
+            isWorkPhase = false; // Cambiar a fase de pausa
+            timeLeft = parseInt(pauseDurationInput.value) * 60; // Configurar duración de la pausa
+            timerDisplay.style.color = 'yellow'; // Cambiar el color del contador a amarillo
+            startTimer();
+        }
+
+        function togglePause() {
+            if (timerInterval) {
+                clearInterval(timerInterval); // Pausar el temporizador
+                timerInterval = null;
+                isPaused = true;
+            } else {
+                startTimer(); // Reanudar si estaba pausado
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            isPaused = false;
+            isWorkPhase = true; // Volver a la fase de flujo
+            timeLeft = parseInt(workDurationInput.value) * 60; // Restablecer a la duración inicial
+            timerDisplay.style.color = 'white'; // Resetear el color del contador
+            message.textContent = ''; // Limpiar el mensaje
+            updateDisplay();
+        }
+
+        function showMessage(msg) {
+            message.textContent = msg;
+        }
+
+        // Inicializar la pantalla al cargar
+        updateDisplay();
+
+        // Agregar eventos a los botones
+        startBtn.addEventListener("click", startTimer);
+        pauseBtn.addEventListener("click", togglePause);
+        resetBtn.addEventListener("click", resetTimer);
+    </script>
+</body>
+</html>
